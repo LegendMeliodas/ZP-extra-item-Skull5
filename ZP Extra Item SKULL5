@@ -345,27 +345,27 @@ public fw_Item_Deploy_Post(weapon_ent)
 
 public CurrentWeapon(id)
 {
-     replace_weapon_models(id, read_data(2))
+    replace_weapon_models(id, read_data(2));
 
-     if(read_data(2) != CSW_SG550 || !g_has_skull5[id])
-          return
-     
-     static Float:iSpeed
-     if(g_has_skull5[id])
-          iSpeed = get_pcvar_float(cvar_spd_skull5)
-     
-     static weapon[32],Ent
-     get_weaponname(read_data(2),weapon,31)
-     Ent = find_ent_by_owner(-1,weapon,id)
-     if(Ent)
-     {
-          static Float:Delay
-          Delay = get_pdata_float( Ent, 46, 4) * iSpeed
-          if (Delay > 0.0)
-          {
-               set_pdata_float(Ent, 46, Delay, 4)
-          }
-     }
+    if(read_data(2) == CSW_SG550 && g_has_skull5[id])
+    {
+        new Float:iSpeed = get_pcvar_float(cvar_spd_skull5);
+        new weapon[32];
+        get_weaponname(read_data(2), weapon, sizeof(weapon) - 1);
+        static Ent;
+        if(!Ent)
+        {
+            Ent = find_ent_by_owner(-1, weapon, id);
+        }
+        if(Ent)
+        {
+            new Float:Delay = get_pdata_float(Ent, 46, 4) * iSpeed;
+            if(Delay > 0.0)
+            {
+                set_pdata_float(Ent, 46, Delay, 4);
+            }
+        }
+    }
 }
 
 replace_weapon_models(id, weaponid)
