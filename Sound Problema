@@ -1,0 +1,212 @@
+/*================================================================================
+
+----------------------------
+-*- [ZP] Ambience Sounds -*-
+----------------------------
+
+This plugin is part of Zombie Plague Mod and is distributed under the
+terms of the GNU General Public License. Check ZP_ReadMe.txt for details.
+
+================================================================================*/
+
+
+
+#include <amxmodx>
+#include <amx_settings_api>
+#include <zp50_gamemodes>
+#include <zombieplague>
+#include <cromchat>
+
+// Settings file
+new const ZP_SETTINGS_FILE[] = "zombieplague.ini"
+
+#define TASK_PURE 200
+#define TASK_AMBIENCESOUNDS 100
+#define TASKSOUND (tarefa - TASK_AMBIENCESOUNDS)  // Para identificar e remover a tarefa de cada jogador sem afetar o valor
+
+new Array:g_ambience_sounds_handle
+new Array:g_ambience_durations_handle
+
+new g_StopSound[33]
+new g_maxplayers
+
+public plugin_init()
+{
+	register_plugin("[ZP] Ambience Sonds", ZP_VERSION_STRING, "ZP Dev Team")
+	register_event("30", "event_intermission", "a")
+	
+	register_clcmd("say /sound", "CDisable_Ambience_Sound")    // Comando para ativar/desativar o som
+	
+	g_maxplayers = get_maxplayers()
+	
+}
+
+public plugin_precache()
+{
+	g_ambience_sounds_handle = ArrayCreate(1, 1)
+	g_ambience_durations_handle = ArrayCreate(1, 1)
+	
+	new index, modename[32], key[64]
+	for (index = 0; index < zp_gamemodes_get_count(); index++)
+	{
+		zp_gamemodes_get_name(index, modename, charsmax(modename))
+		
+		new Array:ambience_sounds = ArrayCreate(64, 1)
+		formatex(key, charsmax(key), "SOUNDS (%s)", modename)
+		amx_load_setting_string_arr(ZP_SETTINGS_FILE, "Ambience Sounds", key, ambience_sounds)
+		if (ArraySize(ambience_sounds) > 0)
+		{
+			// Precache ambience sounds
+			new sound_index, sound[128]
+			for (sound_index = 0; sound_index < ArraySize(ambience_sounds); sound_index++)
+			{
+				ArrayGetString(ambience_sounds, sound_index, sound, charsmax(sound))
+				if (equal(sound[strlen(sound)-4], ".mp3"))
+				{
+					format(sound, charsmax(sound), "sound/%s", sound)
+					precache_generic(sound)
+				}
+				else
+					precache_sound(sound)
+			}
+		}
+		else
+		{
+			ArrayDestroy(ambience_sounds)
+			amx_save_setting_string(ZP_SETTINGS_FILE, "Ambience Sounds", key, "")
+		}
+		ArrayPushCell(g_ambience_sounds_handle, ambience_sounds)
+		
+		new Array:ambience_durations = ArrayCreate(1, 1)
+		formatex(key, charsmax(key), "DURATIONS (%s)", modename)
+		amx_load_setting_int_arr(ZP_SETTINGS_FILE, "Ambience Sounds", key, ambience_durations)
+		if (ArraySize(ambience_durations) <= 0)
+		{
+			ArrayDestroy(ambience_durations)
+			amx_save_setting_string(ZP_SETTINGS_FILE, "Ambience Sounds", key, "")
+		}
+		ArrayPushCell(g_ambience_durations_handle, ambience_durations)
+	}
+}
+
+// Event Map Ended
+public event_intermission()
+{
+         new id   // Faz um loop percorrendo todos os jogadores do servidor
+	for (id = 1; id <= g_maxplayers; id++)
+	{
+	       remove_task(TASK_AMBIENCESOUNDS+id)  // Modo de jogo termina, o som para
+	}
+}
+
+public client_putinserver(id)    // quando o jogador entrar, true significa que o som será tocado.
+{
+	g_StopSound[id] = true
+}
+
+public client_disconnected(id)
+{
+	g_StopSound[id] = false;  // quando o jogador sair, false significa que o som NÃO será tocado.
+}
+
+
+public zp_fw_gamemodes_end()  
+{
+	new id   // Faz um loop percorrendo todos os jogadores do servidor
+	for (id = 1; id <= g_maxplayers; id++)
+	{
+	       remove_task(TASK_AMBIENCESOUNDS+id)  // Modo de jogo termina, o som para
+	}
+	
+}
+
+public zp_fw_gamemodes_start()
+{
+	// Start ambience sounds after a mode begins
+	remove_task(TASK_AMBIENCESOUNDS)   // Por garantia o som de fundo e parado novamente (padrão do codigo)
+	
+	new id   // Faz um loop percorrendo todos os jogadores do servidor
+	for (id = 1; id <= g_maxplayers; id++)
+	{
+	       if(g_StopSound[id])  // Se a matriz do jogador for true toque o som
+	       {
+	                set_task(2.0, "ambience_sound_effects", TASK_AMBIENCESOUNDS+id)
+	       }
+         }
+}
+
+public CDisable_Ambience_Sound(id)
+{
+    g_StopSound[id] = !g_StopSound[id];
+    
+    if (g_StopSound[id])
+    {
+        CC_SendMessage(id, "&x04[Debug Sound] &x01Som ativo, use &x04/sound&x01 para desativar.");
+        if (zp_has_round_started())
+        {
+            set_task(1.0, "ambience_sound_effects", TASK_AMBIENCESOUNDS + id, _, _, "b");
+        }
+
+    }
+    else
+    {
+        CC_SendMessage(id, "&x04[Debug Sound] &x01Som desativado.");
+        remove_task(TASK_AMBIENCESOUNDS + id);	
+    
+    }
+}
+
+/*
+public CDisable_Ambience_Sound(id)
+{
+    g_StopSound[id] = !g_StopSound[id];
+    
+    if (g_StopSound[id])
+    {
+        CC_SendMessage(id, "&x04[Debug Sound] &x01Som ativo, use &x04/sound&x01 para desativar.");
+        remove_task(TASK_AMBIENCESOUNDS + id);
+    }
+    else
+    {
+        CC_SendMessage(id, "&x04[Debug Sound] &x01Som desativado.");
+        if (zp_has_round_started())
+        {
+            set_task(1.0, "ambience_sound_effects", TASK_AMBIENCESOUNDS + id, _, _, "b");
+        }
+    }
+}
+*/	
+
+// Ambience Sound Effects Task
+public ambience_sound_effects(id)
+{
+	// Play a random sound depending on game mode
+	new current_game_mode = zp_gamemodes_get_current()
+	new Array:sounds_handle = ArrayGetCell(g_ambience_sounds_handle, current_game_mode)
+	new Array:durations_handle = ArrayGetCell(g_ambience_durations_handle, current_game_mode)
+	
+	// No ambience sounds loaded for this mode
+	if (sounds_handle == Invalid_Array || durations_handle == Invalid_Array)
+		return;
+	
+	// Get random sound from array
+	new sound[64], iRand, duration
+	iRand = random_num(0, ArraySize(sounds_handle) - 1)
+	ArrayGetString(sounds_handle, iRand, sound, charsmax(sound))
+	duration = ArrayGetCell(durations_handle, iRand)
+	
+	// Play it on clients
+	PlaySoundToClients(sound)
+	
+	// Set the task for when the sound is done playing
+	set_task(float(duration), "ambience_sound_effects", TASK_AMBIENCESOUNDS)
+}
+
+// Plays a sound on clients
+PlaySoundToClients(const sound[])
+{
+if (equal(sound[strlen(sound)-4], ".mp3"))
+	client_cmd(0, "mp3 play ^"sound/%s^"", sound)
+	else
+		client_cmd(0, "spk ^"%s^"", sound)
+}
